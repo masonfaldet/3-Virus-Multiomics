@@ -1,0 +1,39 @@
+{
+  "root": "../parquets",
+  "modalities": [
+    "lipid",
+    "metabolite"
+  ],
+  "polarities": [
+    "+",
+    "-"
+  ],
+  "conditions": [
+    "CHIKV",
+    "DENV",
+    "ZIKV"
+  ],
+  "time_points": [
+    0,
+    5,
+    7,
+    14,
+    21
+  ],
+  "output_csv": "results/out_csvs/selected_features_20251118_211050.csv",
+  "acc_threshold": 0.75,
+  "lambda_": 0.2,
+  "step_size": null,
+  "delta_tol": 1e-06,
+  "max_iter": 20000,
+  "fit_intercept": true,
+  "n_folds": 5,
+  "cv_random_state": 42,
+  "weight_tol": 1e-08,
+  "filter_groupwise_missingness": true,
+  "min_prop": 0.65,
+  "min_group_n": 1,
+  "require_all_groups": false,
+  "imputer": "two_step_label_agnostic",
+  "scale": "standard"
+}
