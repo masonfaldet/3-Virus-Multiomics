@@ -1,0 +1,947 @@
+---
+title: "3VLP heatmap"
+author: "PSS"
+date: "2025-04-22"
+output: html_document
+---
+
+
+
+**LIPID CLASS COLORS AND ORDERS**
+```{r}
+library(tidyverse)
+library(RColorBrewer)
+
+
+fontsize <- 12
+
+#3 virus colors
+colors <- c('DENV'='indianred2', 'ZIKV'='goldenrod2', 'CHIKV'='deepskyblue1', 'MOCK'='darkgray', 'NONFED'='white')
+colorstreatment <- c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick4', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4')
+colorsday <- c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4')
+
+#rpColors <-  c('D7' = 'indianred1', 'D14'='indianred4', 'Z7'='goldenrod1', 'Z14'='goldenrod4', 'C7'='deepskyblue1', 'C14'='deepskyblue4', 'M7'='lightgray', 'M14' = 'darkgray')
+
+
+#NS1 mouse tissue colors
+# fontsize = 12
+# tisColors <- c('Blood' = 'darkred', 'Brain' = 'pink', 'Small Intestine' = 'sienna3', 'Heart' = 'red', 
+#                'Kidney' = 'steelblue2', 'Liver' = 'springgreen4', 'Lung' = 'orchid4', 'Spleen' = 'seagreen2' )
+
+#classOrder <- c("TG","PC","FA", "PI", "PE", "PG", "ST", "PA", "PS", "DG", "HexCer", "CL", "Cer", "SM", "CerPE", "WE", "LPE", "LPC", "Hex2Cer", "SFE", "CAR", "LPS", "IPC", "CE", "MG", "NAE", "LPA", "SHexCer", "LPI", "FAHFA", "CoA", "FOH", "LPG", "MGDG", "CerP", "SPB","NAT", "MIPC", "SQDG", "DGCC","PIP", "SPBP", "ACer", "DGDG", "PIP2", "DGTA","DGTS", "M(IP)2C")
+
+classFA <- c('FA', 'CAR', 'CoA', 'NAE', 'NAT')
+colorsFA <- data.frame(Class = classFA, color = colorRampPalette(rev(brewer.pal(8, 'Reds')))(5))
+
+classSP <- c('SPB', 'SPBP', 'Cer', 'ACer', 'CerP', 'IPC', 'CerPE', 'SM', 'HexCer', 'MIPC', 'M(IP)2C', 'Hex2Cer', 'SHexCer')
+colorsSP <- data.frame(Class = classSP, color = colorRampPalette(rev(brewer.pal(8, 'Oranges')))(13))
+
+classGL <- c('TG', 'DG', 'MG', 'MGDG', 'DGDG', 'SQDG', 'DGTA', 'DGTS', 'DGCC')
+colorsGL <- data.frame(Class = classGL, color = colorRampPalette(rev(brewer.pal(8, 'Purples')))(9))
+
+classGLo <- c('DG O-', 'MG O-')
+colorsGLo <- data.frame(Class = classGLo, color = colorRampPalette(rev(brewer.pal(8, 'Purples')))(2))
+
+classST <- c('ST', 'CE')
+colorsST <- data.frame(Class = classST, color = c("#C51B7D" ,"#DE77AE"))
+
+classGP <- c('PC', 'PA', 'PS', 'PE', 'PG', 'PI', 'PIP', 'CL', 'BMP', 'PEth', 'PT')
+colorsGP <- data.frame(Class = classGP, color = colorRampPalette(rev(brewer.pal(8, 'Blues')))(11))
+
+classGPo <- c('PC O-', 'PA O-', 'PS O-', 'PE O-', 'PG O-', 'PI O-')
+colorsGPo <- data.frame(Class = classGPo, color = colorRampPalette(rev(brewer.pal(8, 'Blues')))(6))
+
+classLGP <- c('LPC', 'LPA', 'LPS', 'LPE', 'LPG', 'LPI')
+colorsLGP <- data.frame(Class = classLGP, color = colorRampPalette(rev(brewer.pal(8, 'Greens')))(6))
+
+classLGPo <- c('LPC O-', 'LPA O-', 'LPS O-', 'LPE O-', 'LPG O-', 'LPI O-')
+colorsLGPo <- data.frame(Class = classLGPo, color = colorRampPalette(rev(brewer.pal(8, 'Greens')))(6))
+
+#colorsAll <- bind_rows(colorsFA, colorsGL, colorsSP, colorsST, colorsGP, colorsLGP) %>% deframe()
+colorsAll <- bind_rows(colorsFA, colorsGL, colorsGLo, colorsSP, colorsST, colorsGP, colorsGPo, colorsLGP, colorsLGPo) %>% deframe()
+
+# colorstest <- c('FA' = "#99000D", 'CAR'= "#E63228", 'CoA' = "#FB7E5E" , 'NAE'= "#FCC4AD", 'NAT'= "#FFF5F0", 'TG'= "#4A1486", 'DG'= "#66499F", 'MG'= "#7A71B4", 'MGDG'= "#928FC2",'DGDG'= "#ADABD2", 'SQGD' = "#C7C7E1", 'DGTA'= "#DFDEED", 'DGTS'= "#F0EEF6", 'DGCC'= "#FCFBFD", 'SPB'= "#8C2D04", 'SPBP'= "#B83C02",'Cer'= "#DD4D04", 'ACer'= "#EB600E", 'CerP' ="#F57520", 'IPC'= "#FC8A38", 'CerPE'= "#FD9D53", 'SM'= "#FDB06F", 'HexCer'= "#FDC48F", 'MIPC'= "#FDD5AD", 'M(IP)2C'= "#FDE2C6", 'Hex2Cer'= "#FEECDA", 'SHexCer'= "#FFF5EB", 'ST' = "#C51B7D", 'CE'="#DE77AE", 'PC'="#084594", 'PA'= "#1963AB", 'PS'= "#2E7EBB", 'PE' = "#4694C7", 'PG'= "#62A8D2", 'PI'= "#84BCDB", 'PIP'= "#A6CDE3", 'CL'="#C2D9ED", 'BMP'= "#D4E4F3", 'PEth'= "#E5EFF9", 'PT'= "#F7FBFF", 'LPC'= "#005A32", 'LPA'= "#2F974E", 'LPS'= "#69BF71", 'LPE'= "#A8DCA2", 'LPG'= "#D9F0D3", 'LPI'= "#F7FCF5")
+
+
+#classOrder <- c(classFA, classGL, classSP, classST, classGP, classLGP)
+classOrder <- c(classFA, classGL, classGLo, classSP, classST, classGP, classGPo, classLGP, classLGPo)
+
+rm(colorsFA, colorsGL, colorsGLo, colorsSP, colorsST, colorsGP, colorsGPo, colorsLGP, colorsLGPo)
+```
+
+
+3V data
+```{r}
+library(tidyverse)
+library(here)
+
+dr_here() #show the project root folder for here()
+here() #print the project root folder for here()
+
+project <- '3VLP'
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+getwd()
+
+
+conditionLevels <- c('NONFED0', 'MOCK0', 'MOCK5', 'MOCK7', 'MOCK14', 'MOCK21', 'DENV0', 'DENV5', 'DENV7', 'DENV14', 'DENV21', 'ZIKV0', 'ZIKV5', 'ZIKV7', 'ZIKV14', 'ZIKV21', 'CHIKV0', 'CHIKV5', 'CHIKV7', 'CHIKV14', 'CHIKV21')
+conditionLevels2 <- c('NONFED0', 'MOCK0', 'DENV0', 'ZIKV0', 'CHIKV0',  'MOCK5','DENV5','ZIKV5','CHIKV5', 'MOCK7', 'DENV7', 'ZIKV7','CHIKV7', 'MOCK14',  'DENV14', 'ZIKV14',   'CHIKV14','MOCK21',  'DENV21', 'ZIKV21',  'CHIKV21')
+                     
+
+######################## Titer results from qRTPCR #########################
+titer <- read_csv(here('metadata/241203 3 virus mosquito titers format.csv')) %>% 
+  select(-RTPCR) %>%
+  dplyr::rename(VirusTiter = Copy.Number) %>%
+  mutate(DPI = factor(DPI, levels = c('5', '7', '14', '21'))) %>%
+  mutate(Mosquito = paste0(Virus, DPI, '_', Sample.Number)) %>%
+  select(Mosquito, VirusTiter)
+
+meta <- read_csv(here(paste0('metadata/',project,' metadata.csv'))) %>%
+    mutate(Batch = str_sub(filename, start = 20, end = 23), .after='Type') %>%
+    mutate(Dilution = case_when(str_detect(filename, 'Dil1x') ~ 1,
+                              str_detect(filename, 'Dil2x') ~ 0.5,
+                              str_detect(filename, 'Dil4x') ~ 0.25,
+                              str_detect(filename, 'Dil10x') ~ 0.1)) 
+
+#group filtered and 2 step imputed plist with areas... NOT LOG2 transformed
+plist <- read_csv(here(paste0('0 Preprocess and Analyze with GroupFiltering and 2StepImpute/250617 ',project,' data preprocessing/plist-grpfilt-impute2step-areas-',project,'.csv')))
+
+#combine plist, metadata and titer
+data <- plist %>% 
+  pivot_longer(contains(':area'), names_to = 'filename', values_to = 'Abundance') %>%
+    left_join(meta, by = 'filename') %>%
+  left_join(titer, by = 'Mosquito') %>%
+  mutate(Abundance = log2(Abundance)) %>%  #log2 transform
+  mutate(Condition = factor(Condition, levels = conditionLevels))
+
+
+#Lipidmaps tentative IDs
+LMID <- read_csv(here(paste0('metadata/',project,' LMID.csv')))
+
+data_LM <- data %>%
+  left_join(LMID, by = 'mz') %>%
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+
+
+#Lipidannotator MSMS IDs
+LAmatch <- read_csv(here(paste0('metadata/lipidannotator-id-matched-',project,'.csv'))) %>%
+  mutate(LA.Class = gsub(" .*$", "", `LA.Compound Name`)) %>%
+  mutate(LA.Class = ifelse(str_detect(LA.Class, 'ACar'), 'CAR', LA.Class)) %>%
+  mutate(LA.CmpdFeat = paste0(`LA.Compound Name`, ' ', feature))
+
+data_LA <- data %>% 
+left_join(LAmatch, by = 'feature')
+
+#DPI and plot settings
+whatDPI <- '_5-21_'
+plotheight <- 20
+#definegaps <-  c(10, 60, 110, 160) #for all DPI
+# definegaps <-  c(10,20,30,40)      #for 0DPI only
+ definegaps <-  c(40, 80, 120)       #for 5-21 DPI
+```
+
+Lipidannotator MSMS ID heatmap
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+
+hmdatLM <- data_LA %>% filter(DPI != '0') %>%
+  filter(!is.na(`LA.Compound Name`)) %>%
+  select(feature, Abundance, Condition, Mosquito, Type, contains('LA.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  # mutate(FAchain = case_when(str_detect(LM.Name, 'PC O-') ~ as.numeric(str_match(LM.Name, '.*-(.+):.*')[,2]),
+  #                            .default = as.numeric(str_match(LM.Name, '.* (.+):.*')[,2])),
+  #        FAunsat = str_match(LM.Name, '.*:(.).*')[,2],
+  #        PEorder = case_when(str_detect(LM.Name, 'PC O-') ~ 2, .default = 1)) %>%
+  # arrange(LM.Class,PEorder,FAchain,FAunsat) %>%
+  arrange(`LA.Compound Name`) %>%
+  arrange(Condition) %>%
+  distinct(LA.CmpdFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LA.CmpdFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = TRUE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_LAids_', project, whatDPI, 'clusterCols','.png'), width = 40, height = plotheight)
+
+```
+
+
+
+PC!
+pheatmap heatmaps of raw abundance with LM tentative IDs
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+# LMlowdelta_QCfilt <- LMlowdelta
+# save(LMlowdelta_QCfilt, file = 'LMlowdelta_QCfilt_3VLP.rda')
+
+#class
+currClass <- 'PC|LPC'
+
+#checking TG ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(!str_detect(LM.Class, 'IPC'), str_detect(LM.Class, currClass), LM.Ion == '[M+H]+') %>%
+  mutate(FAchain = case_when(str_detect(LM.Name, 'PC O-') ~ as.numeric(str_match(LM.Name, '.*-(.+):.*')[,2]),
+                             .default = as.numeric(str_match(LM.Name, '.* (.+):.*')[,2])),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2],
+         PEorder = case_when(str_detect(LM.Name, 'PC O-') ~ 2, .default = 1)) %>%
+  arrange(LM.Class,PEorder,FAchain,FAunsat) %>%
+  arrange(LM.Name) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project, whatDPI, 'PC-LPC','.png'), width = 28, height = plotheight)
+
+```
+
+TG updated
+pheatmap heatmaps of raw abundance with LM tentative IDs
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+#class
+currClass <- 'TG'
+
+#checking TG ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass), LM.Ion == '[M+NH4]+') %>%
+  mutate(FAchain = case_when(str_detect(LM.Name, 'PC O-') ~ as.numeric(str_match(LM.Name, '.*-(.+):.*')[,2]),
+                             .default = as.numeric(str_match(LM.Name, '.* (.+):.*')[,2])),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2],
+         PEorder = case_when(str_detect(LM.Name, 'PC O-') ~ 2, .default = 1)) %>%
+  arrange(LM.Class,PEorder,FAchain,FAunsat) %>%
+  arrange(LM.Name) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, currClass, '.png'), width = 28, height = plotheight)
+
+```
+
+
+
+DG
+pheatmap heatmaps of raw abundance with LM tentative IDs
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+currClass <- 'DG'
+
+#checking ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass)) %>%
+  mutate(FAchain = as.numeric(str_match(LM.Name, '.* (.+):.*')[,2]),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2],
+         DGorder = case_when(str_detect(LM.Name, 'DG O-') ~ 2, .default = 1)) %>%
+  arrange(LM.Class,DGorder,FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, currClass, '.png'), width = 28, height = plotheight)
+
+```
+
+FA update
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+currClass <- 'FA'
+
+#checking ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass), !str_detect(LM.Name, 'FA 4:1')) %>%
+  mutate(FAchain = as.numeric(str_match(LM.Name, '.*FA (.+):.*')[,2]),
+         FAunsat = str_match(LM.Name, '.*:(.).*')) %>%
+  arrange(LM.Class,FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, currClass, '.png'), width = 18, height = plotheight)
+
+```
+
+
+NAE update
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+currClass <- 'NAE'
+
+#checking ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass), !str_detect(LM.Name, 'FA 4:1')) %>%
+  mutate(FAchain = as.numeric(str_match(LM.Name, '.*[A-Z] (.+):.*')[,2]),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2]) %>%
+  arrange(LM.Class,FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, currClass, '.png'), width = 8, height = plotheight)
+
+```
+
+
+CAR update
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+currClass <- 'CAR'
+
+#checking ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass), !str_detect(LM.Name, 'FA 4:1')) %>%
+  mutate(FAchain = as.numeric(str_match(LM.Name, '.*[A-Z] (.+):.*')[,2]),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2]) %>%
+  arrange(LM.Class,FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, currClass, '.png'), width = 8, height = plotheight)
+
+```
+
+
+
+SPB and SPBP
+pheatmap heatmaps of raw abundance with LM tentative IDs
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+
+#class
+currClass <- 'SPB|SPBP'
+
+#checking ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+#SPB 5
+#SPBP 3
+
+#Cer 40
+#ACer 8
+#CerP 5
+
+
+#SM 31
+#CerPE 46
+#IPC 17
+
+#MIPC 6
+#M(IP)2C 0
+
+#HexCer 59
+#Hex2Cer 3
+#SHexCer 6
+
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass)) %>%
+  mutate(FAchain = as.numeric(str_match(LM.Name, '.*[A-Z] (.+):.*')[,2]),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2]) %>%
+  arrange(FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, 'SPB-SPBP', '.png'), width = 5, height = plotheight)
+
+```
+
+
+
+Cer, ACer and CerP
+pheatmap heatmaps of raw abundance with LM tentative IDs
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+
+#class
+currClass <- 'Cer\\b|ACer\\b|CerP\\b'
+
+#checking TG ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass), !str_detect(LM.Class, 'HexCer|SHexCer|Hex2Cer')) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+#SPB 5
+#SPBP 3
+
+#Cer 40
+#ACer 8
+#CerP 5
+
+
+#SM 31
+#CerPE 46
+#IPC 17
+
+#MIPC 6
+#M(IP)2C 0
+
+#HexCer 59
+#Hex2Cer 3
+#SHexCer 6
+
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass),!str_detect(LM.Class, 'HexCer|SHexCer|Hex2Cer')) %>%
+  mutate(FAchain = as.numeric(str_match(LM.Name, '.* (.+):.*')[,2]),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2]) %>%
+  arrange(FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, 'Cer-CerP_ACer', '.png'),  width = 16, height = plotheight)
+
+```
+
+
+SM, CerPE, IPC, MIPC
+pheatmap heatmaps of raw abundance with LM tentative IDs
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+
+#class
+currClass <- 'SM|CerPE|IPC'
+
+#checking TG ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+#SPB 5
+#SPBP 3
+
+#Cer 40
+#ACer 8
+#CerP 5
+
+
+#SM 31
+#CerPE 46
+#IPC 17
+#MIPC 6
+#M(IP)2C 0
+
+#HexCer 59
+#Hex2Cer 3
+#SHexCer 6
+
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass)) %>%
+  mutate(FAchain = as.numeric(str_match(LM.Name, '.* (.+):.*')[,2]),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2]) %>%
+  arrange(LM.Class,FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, 'SM-CerPE-IPC-MIPC', '.png'),  width = 16, height = plotheight)
+
+```
+
+
+HexCer, Hex2Cer, SHexCer
+pheatmap heatmaps of raw abundance with LM tentative IDs
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+
+#class
+currClass <- 'HexCer|Hex2Cer|SHexCer'
+
+#checking TG ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+#SPB 5
+#SPBP 3
+
+#Cer 40
+#ACer 8
+#CerP 5
+
+
+#SM 31
+#CerPE 46
+#IPC 17
+#MIPC 6
+#M(IP)2C 0
+
+#HexCer 59
+#Hex2Cer 3
+#SHexCer 6
+
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass)) %>%
+  mutate(FAchain = as.numeric(str_match(LM.Name, '.* (.+):.*')[,2]),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2]) %>%
+  arrange(LM.Class,FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, 'HexCer-Hex2Cer-SHexCer', '.png'),  width = 14, height = plotheight)
+
+```
+
+
+PE, LPE
+pheatmap heatmaps of raw abundance with LM tentative IDs
+```{r}
+library(pheatmap)
+colorshm <- list(DPI=c('0' = '#264653','5'='#2a9d8f','7'='#e9c46a','14'='#e76f51','21'='firebrick4'),
+           Treatment = c('NONFED' = 'black', 'MOCK' = 'gray', 'DENV' = 'firebrick3', 'ZIKV' = 'darkgoldenrod4', 'CHIKV' = 'deepskyblue4'))
+
+LMlowdelta <- data_LM %>% filter(!is.na(LM.Name)) %>%
+   mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+   group_by(feature) %>% slice(which.min(LM.Delta)) %>% ungroup()
+LMlowdelta <- c(LMlowdelta$LMnameFeat)
+
+
+#class
+currClass <- '\\bPE|LPE'
+
+#checking TG ion types and names, etc
+check <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  filter(str_detect(LM.Class, currClass)) %>%
+  distinct(feature, .keep_all = TRUE) %>% count(LM.Name, LM.Ion)
+
+
+
+
+
+hmdatLM <- data_LM %>% 
+  mutate(LMnameFeat = paste0(LM.Name, ' ', LM.Ion, ' ', feature)) %>%
+  filter(LMnameFeat %in% LMlowdelta) %>%
+  select(feature, LMnameFeat, Abundance, Condition, Mosquito, Type, contains('LM.'), filename) %>%
+  mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+  filter(Type == 'Exp') %>% 
+  filter(str_detect(LM.Class, currClass)) %>%
+  mutate(FAchain = case_when(str_detect(LM.Name, 'PE O-') ~ as.numeric(str_match(LM.Name, '.*-(.+):.*')[,2]),
+                             .default = as.numeric(str_match(LM.Name, '.* (.+):.*')[,2])),
+         FAunsat = str_match(LM.Name, '.*:(.).*')[,2],
+         PEorder = case_when(str_detect(LM.Name, 'PE O-') ~ 2, .default = 1)) %>%
+  arrange(LM.Class,PEorder,FAchain,FAunsat) %>%
+  arrange(Condition) %>%
+  distinct(LMnameFeat, Mosquito, Abundance) %>%
+  pivot_wider(names_from = LMnameFeat, values_from = Abundance) %>%
+  column_to_rownames('Mosquito')
+
+hmdatLM <- as.matrix(hmdatLM)
+
+groups <- data_LM %>% select(Mosquito, Condition, DPI, Treatment) %>% distinct(Mosquito, .keep_all = TRUE) %>% filter(!is.na(Mosquito)) %>%
+ mutate(Condition = factor(Condition, levels = conditionLevels)) %>%
+ arrange(Condition) %>% 
+ select(Mosquito, DPI, Treatment) %>%
+column_to_rownames('Mosquito') %>% as.data.frame()
+
+
+
+plot1 <- pheatmap(hmdatLM, scale = 'column', cluster_rows = FALSE, cluster_cols = FALSE,
+                  gaps_row = definegaps,
+                  annotation_row = groups,
+                  annotation_colors = colorshm,
+                  color = colorRampPalette(c('blue','white', 'red'))(50))
+
+
+ggsave(plot = plot1, paste0('hm_', project,whatDPI, 'PE-LPE', '.png'),  width = 14, height = plotheight)
+
+```
+
+
+

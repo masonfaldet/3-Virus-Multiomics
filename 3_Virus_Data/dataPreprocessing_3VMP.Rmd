@@ -1,0 +1,497 @@
+---
+title: "3V preprocessing"
+author: "PSS"
+date: "2025-06-17"
+output: word_document
+---
+
+The plan in this rmd is to perform FOR A GIVEN DATASET (project); e.g. 3VLP, 3VLN, 3VMP, 3VMN
+CHUNK1:
+>call in original (unchanged) mzmine peaklist output
+>generate metadata; filename and its related to Type, Mosquito, Condition, DPI, Treatment, Group
+
+CHUNK2:
+>group based presence filtering
+>2 step imputation (1/5 min and knn based on group presence)
+>generate two peaklists from the group filtered and 2step imputed
+   "-areas" that will contain feature identifiers and peak areas
+   '-full' that will contain feature identifiers and all info that pops out of mzmine
+
+CHUNK 3:
+>limma analysis
+
+CHUNK 4:
+>limma results: 
+  define significant up/down differential abundance
+  concatenate results into fewer .csv files
+
+CHUNK 5:
+>lipidannotator results
+
+CHUNK 6:
+>CEU mass mediator tentative ID search
+
+
+
+CHUNK 1
+import original mzmine output peak list
+generate metadata for sample types and conditions, etc
+```{r}
+library(tidyverse)
+library(here)
+
+dr_here() #show the project root folder for here()
+here() #print the project root folder for here()
+
+project <- '3VMP'
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+getwd()
+
+
+#original mzmine plist
+plist <- read_csv(here('250109_3Virus_MP_mzmine/Aligned_feature_list_gapfill_dup_rmblank-pList_corr_quant_modular.csv')) %>%
+  mutate(feature = paste0('MZ', round(mz, 4), '_', round(rt, 2)), .after = 'id') 
+
+
+#create metadata from original mzmine plist
+#for 3VMP QC dilution filenames use 'Dil' in their name
+#for 3VLP and 3VLN QC dilution filenames use 'Conc' in their name
+
+meta <- plist %>%
+  select(id,feature,mz,rt, contains(':area')) %>%
+  pivot_longer(contains(':area'), names_to = 'filename', values_to = 'Abundance') %>%
+  relocate(c('filename', 'Abundance'), .after = 'rt') %>%
+  mutate(Type = case_when(str_detect(filename, 'pQC\\b') ~ 'QC',  #use 'pQC\\b' if pQC is the end of the filename string (probably have to str_sub(filename) to get this)
+                                        str_detect(filename, 'DDA') ~ 'DDA',
+                                        str_detect(filename, 'Extr') ~ 'ExtrBlank',
+                                        str_detect(filename, 'Dil') ~ 'QCDil',
+                                          .default = 'Exp'), .after = 'filename') %>%
+  mutate(Batch = str_sub(filename, start = 20, end = 23), .after='Type') %>%
+  mutate(Mosquito = str_sub(filename, start = 29, end = -11), 
+         Mosquito = ifelse(str_detect(Mosquito, 'pQC|ExtrBl'), NA_character_, Mosquito), .after='Type') %>%
+  mutate(Condition = str_extract(Mosquito, ".+?(?=_)"),
+         DPI = as.double(str_extract(Mosquito, '[0-9]+')),
+         Treatment = str_extract(Mosquito, "[A-Z]+"), .after = 'Mosquito') %>%
+  mutate(Group = Condition) %>%
+  select(filename, Type, Mosquito, Condition, DPI, Treatment, Group) %>%
+  distinct(filename, .keep_all = TRUE)
+
+
+
+
+
+
+```
+
+CHUNK 2
+Experimental samples only
+Group filter and 2 step impute
+```{r}
+#impute by 1/5 min, followed by knn
+
+#"my_data" is long form with id, sample name, and peak area
+
+# in these steps, I'm not using the pooled QC, but I often have included them in a quality-control step
+# also, I have interim objects because I use information from these for building tables, etc in reports
+
+
+####### STEP 1
+# remove any features that are missing in all samples
+# these features are generally introduced by blanks / additional samples that don't match the treatments of interest
+
+my_data <- plist %>% select(id, contains(':area')) %>%
+  pivot_longer(contains(':area'), names_to = 'filename', values_to = 'area')
+
+all_missing <- my_data %>% 
+  group_by(id) %>%
+  mutate(all_na = sum(is.na(area)) == n()) %>%
+  filter(all_na == TRUE) %>% 
+  count(id)
+
+clean_data <-  my_data %>%
+  filter(!(id %in% all_missing$id))
+
+
+######## STEP 2
+#find features that are missing in more than half of the samples in all groups
+
+#find number of samples with missing value for each treatment group x feature id
+missing_for_imputation <- clean_data %>%
+  left_join(meta %>% select(filename, Mosquito, Group), by = 'filename') %>%
+  filter(!is.na(Group)) %>% #filter out sample Types: Blank, QC, QCDil, DDA
+  group_by(Group, id) %>%
+  summarise(n_missing = sum(is.na(area)))
+
+#pull features missing in >= 50% of the treatment group
+missing_in_group <- missing_for_imputation %>%
+  group_by(id) %>%
+  mutate(groups_missing = sum(n_missing > 5)) %>% #set presence threshold here; 3V data has 10 samples per group so 5 is 50%
+  pivot_wider(names_from = Group, values_from = n_missing) %>%
+  filter(groups_missing == 21) #== 21  means feature is less than 50% present in all experimental groups
+
+#remove features missing in all groups (21 groups for 3 virus data)
+clean_data <- clean_data %>%
+  filter(!id %in% missing_in_group$id)
+
+
+####### STEP 3
+# identify imputation method for each missing feature
+missing_for_imputation <- missing_for_imputation %>%
+  filter(!id %in% missing_in_group$id) %>%
+  #cutoffs based on n=10 per group
+  mutate(impute_method = case_when(n_missing == 0 ~ 'none',
+                                   n_missing > 2 ~ 'min',
+                                   n_missing <= 2 ~ 'knn'))
+
+
+####### STEP 4
+# add impute method to data, and impute 1/5 minimum
+set.seed(272)
+
+imputed_data <- clean_data %>%
+  left_join(meta %>% select(filename, Mosquito, Group), by = 'filename') %>%
+  left_join(missing_for_imputation %>% select(-n_missing), by = c('id', 'Group')) %>%
+  filter(!is.na(Group)) %>%
+  group_by(id) %>%
+  mutate(min_area = min(area, na.rm = TRUE) / 5,
+         min_area = jitter(min_area, 1),
+         area = ifelse(impute_method == 'min' & is.na(area), min_area, area)) %>%
+  ungroup() %>%
+  select(-c(min_area))
+
+
+####### STEP 5
+# impute knn for the remaining missing values
+
+impute_knn <- imputed_data %>% 
+  select(-c(Mosquito, Group, impute_method)) %>%
+  pivot_wider(names_from = filename, values_from = area) %>%
+  as.data.frame() %>%
+  column_to_rownames('id') %>%
+  as.matrix() %>%
+  impute::impute.knn(k = 5, rowmax = 0.2, colmax = 0.8, rng.seed = 12345)
+
+knn_imputed <- impute_knn$data %>%
+  as.data.frame() %>%
+  rownames_to_column('id') %>%
+  as_tibble() %>%
+  mutate(id = as.double(id))
+  #pivot_longer(-id, names_to = 'filename', values_to = 'area')
+
+####### STEP 6
+# create and export group filtered, 2 step imputed peaklists 
+
+#full; with all mzmine output information
+plist_filter_impute_full <- plist %>% 
+  select(-contains(':area')) %>%
+  filter(id %in% knn_imputed$id) %>%
+  left_join(knn_imputed, by = 'id')
+  
+write_csv(plist_filter_impute_full, paste0('plist-grpfilt-impute2step-full-', project, '.csv'))
+  
+#areas; with only feature identifiers and areas
+plist_filter_impute_areas <- plist %>% 
+  select(-contains(':area')) %>%
+  filter(id %in% knn_imputed$id) %>%
+  left_join(knn_imputed, by = 'id') %>% 
+  select(id, feature, mz, rt, contains(':area'))
+  
+write_csv(plist_filter_impute_areas, paste0('plist-grpfilt-impute2step-areas-', project, '.csv'))
+
+```
+
+CHUNK 3
+limma
+export limma results
+export mummichog input formats
+```{r}
+
+
+# data for limma is wide with features in row and samples in columns
+# the feature names go into rownames
+# no other columns should be in the data
+
+limma_data <- plist_filter_impute_areas %>%
+  pivot_longer(contains(':area'), names_to = 'filename', values_to = 'area') %>%
+  mutate(area = log2(area)) %>% #limma requires log2 values
+  pivot_wider(names_from = 'filename', values_from = 'area') %>%
+  select(feature, contains(':area')) %>%
+  as.data.frame %>%
+  column_to_rownames("feature")
+
+
+# limma also requires a vector showing which group the samples are in
+# this needs to be in the same order as the column names
+# groups need to be factors
+# if you want to combine groups, you will need to do that at this stage
+# I include an example called new group
+
+limma_groups <- meta %>% distinct(filename, .keep_all = TRUE) %>% filter(!str_detect(filename, 'QC|ExtrB')) %>%
+  select(filename, Condition) %>%
+  mutate(Condition = factor(Condition)) %>%
+  rename(dataFileName = filename)
+  
+
+identical(limma_groups$dataFileName, names(limma_data))
+
+### limma analysis gives pairwise fold change, t statistic and p-value
+# if you don't have limma, install it from Bioconductor
+# if you don't have BiocManager, you will need to install it first
+
+# install.packages("BiocManager")
+# BiocManager::install("limma")
+
+library(limma)
+
+################ create the design matrix
+
+limma_design <- model.matrix(~ 0 + limma_groups$Condition)
+colnames(limma_design) <- levels(limma_groups$Condition)
+
+
+
+############# define the pairwise contrasts to include
+############# limma has a maximum of 5 pairs
+############# in my example I compare each of the dengue groups to non-dengue
+
+contrasts <- makeContrasts(MOCK0 - NONFED0, DENV0 - MOCK0, DENV5 - MOCK5, DENV7 - MOCK7, DENV14 - MOCK14, DENV21 - MOCK21, ZIKV0 - MOCK0, ZIKV5 - MOCK5, ZIKV7 - MOCK7, ZIKV14 - MOCK14, ZIKV21 - MOCK21, CHIKV0 - MOCK0, CHIKV5 - MOCK5, CHIKV7 - MOCK7, CHIKV14 - MOCK14, CHIKV21 - MOCK21, levels = limma_design)
+
+# MOCK0 - NONFED0, DENV0 - MOCK0, DENV5 - MOCK5, DENV7 - MOCK7, DENV14 - MOCK14, DENV21 - MOCK21, ZIKV0 - MOCK0, ZIKV5 - MOCK5, ZIKV7 - MOCK7, ZIKV14 - MOCK14, ZIKV21 - MOCK21, CHIKV0 - MOCK0, CHIKV5 - MOCK5, CHIKV7 - MOCK7, CHIKV14 - MOCK14, CHIKV21 - MOCK21
+
+############ fit the initial model
+
+
+fit <- lmFit(limma_data, limma_design)
+
+
+############ add the contrasts and make eBayes adjustment
+
+
+fit <- contrasts.fit(fit, contrasts)
+fit <- eBayes(fit)
+
+##  ##
+##  ##
+##  ##
+
+#### LIMMA RESULTS
+## to get the full information for fit:
+# first put the rownames into its own column, or you will lose them
+
+#Results all contrasts combined
+results <- topTable(fit, n = Inf) %>%
+  rownames_to_column('feature') %>%
+  as_tibble 
+
+write_csv(results, paste0('limma_', project, '_allContrasts.csv'))
+
+
+#Results DENV contrasts
+DEN_results <- topTable(fit, coef = c(2,3,4,5,6), n = Inf) %>%
+  rownames_to_column('feature') %>%
+  as_tibble
+
+write_csv(DEN_results, paste0('limma_', project, '_DENV.csv'))
+
+#Results ZIKV contrasts
+ZIKV_results <- topTable(fit, coef = c(7,8,9,10,11), n = Inf) %>%
+  rownames_to_column('feature') %>%
+  as_tibble 
+
+write_csv(ZIKV_results, paste0('limma_', project, '_ZIKV.csv'))
+
+#Results CHIKV contrasts
+CHIKV_results <- topTable(fit, coef = c(12,13,14,15,16), n = Inf) %>%
+  rownames_to_column('feature') %>%
+  as_tibble 
+
+write_csv(CHIKV_results, paste0('limma_', project, '_CHIKV.csv'))
+
+##  ##
+##  ##
+##  ##
+
+
+###write individual contrast results to .csv
+
+comparisons <- c('M0NF0', 'D0M0', 'D5M5', 'D7M7', 'D14M14', 'D21M21', 'Z0M0', 'Z5M5', 'Z7M7', 'Z14M14', 'Z21M21', 'C0M0', 'C5M5', 'C7M7', 'C14M14', 'C21M21')
+
+for(cont in 1:ncol(contrasts)){
+
+  print(colnames(contrasts)[cont])
+  
+  contname <- gsub(' - ', '...', colnames(contrasts)[cont]) #dont need to use this because im building a comparison name vector
+  print(contname)
+  
+  print(paste0('COMPARISON:', comparisons[cont]))
+  
+  
+  result <- topTable(fit, coef = cont, n = Inf) %>%
+    rownames_to_column('feature') %>%
+    as_tibble 
+  
+  write_csv(result, file = paste0('limma_',project, '_', comparisons[cont], '.csv'))
+}
+
+##  ##
+##  ##
+##  ##
+
+###create mummichog inputs from limma results
+
+comparisons <- c('M0NF0', 'D0M0', 'D5M5', 'D7M7', 'D14M14', 'D21M21', 'Z0M0', 'Z5M5', 'Z7M7', 'Z14M14', 'Z21M21', 'C0M0', 'C5M5', 'C7M7', 'C14M14', 'C21M21')
+
+for(cont in 1:ncol(contrasts)){
+
+  print(colnames(contrasts)[cont])
+  
+  contname <- gsub(' - ', '...', colnames(contrasts)[cont]) #dont need to use this because im building a comparison name vector
+  print(contname)
+  
+  print(paste0('COMPARISON:', comparisons[cont]))
+  
+  
+  result <- topTable(fit, coef = cont, n = Inf) %>%
+    rownames_to_column('feature') %>%
+    as_tibble %>%
+    mutate(m.z = str_match(feature, 'MZ(.*?)_')[,2],
+           r.t = sub('.*\\_', '', feature),
+           p.value = adj.P.Val,
+           t.score = t) %>%
+    select(m.z, p.value, t.score, r.t)
+    
+  
+  write_csv(result, file = paste0('mummichogInput_limma_', project, '_', comparisons[cont], '.csv'))
+}
+
+```
+
+
+CHUNK 4
+pull in limma results for PAIRWISE contrasts then concatenate results
+define significant up/down differential abundance
+log2(0.585) = 1.5 fold change
+```{r}
+
+comparisons <- c('M0NF0', 'D0M0', 'D5M5', 'D7M7', 'D14M14', 'D21M21', 'Z0M0', 'Z5M5', 'Z7M7', 'Z14M14', 'Z21M21', 'C0M0', 'C5M5', 'C7M7', 'C14M14', 'C21M21')
+
+for(comp in comparisons){
+  
+  limma <- read_csv(paste0('limma_',project,'_', comp, '.csv')) %>%
+  mutate(DIRECTION = ifelse(.[2] > 0.585, 'UP', 'DOWN')[,1],
+         DIRECTION = ifelse(.[2] < -0.585, 'DOWN', DIRECTION),
+         DIRECTION = ifelse(.[2] < 0.585 & .[2] > -0.585, 'NONE', DIRECTION)[,1]) %>%
+  mutate(Prob = B/(1+B)) %>%
+  dplyr::rename( !! paste0(comp, '_log2FC') := 2,
+          !! paste0(comp, '_AveExpr') := 3,
+          !! paste0(comp, '_t') := 4,
+          !! paste0(comp, '_Pval') := 5,
+          !! paste0(comp, '_adjPval') := 6,
+          !! paste0(comp, '_B') := 7,
+          !! paste0(comp, '_Dir') := 8,
+          !! paste0(comp, '_Prob') := 9)
+  
+  assign(paste0('limma_', comp), limma)
+  rm(limma)
+}
+
+
+pw_limma_DENV <- plyr::join_all(list(limma_D0M0,limma_D5M5,limma_D7M7,limma_D14M14,limma_D21M21), by = 'feature', type = 'left')
+
+pw_limma_ZIKV <- plyr::join_all(list(limma_Z0M0,limma_Z5M5,limma_Z7M7,limma_Z14M14,limma_Z21M21), by = 'feature', type = 'left')
+
+pw_limma_CHIKV <- plyr::join_all(list(limma_C0M0,limma_C5M5,limma_C7M7,limma_C14M14,limma_C21M21), by = 'feature', type = 'left')
+
+pw_limma_NONFED <- limma_M0NF0
+
+
+write_csv(pw_limma_DENV, paste0('limma results_', project, '_pairwise all DENV vs MOCK.csv'))
+write_csv(pw_limma_ZIKV, paste0('limma results_', project, '_pairwise all ZIKV vs MOCK.csv'))
+write_csv(pw_limma_CHIKV, paste0('limma results_', project,'_pairwise all CHIKV vs MOCK.csv'))
+write_csv(pw_limma_NONFED, paste0('limma results_', project, '_pairwise MOCK vs NONFED.csv'))
+
+
+```
+
+
+CHUNK 5
+fuzzy join lipidannotator MSMS identifications
+```{r}
+
+
+
+#lipidannotator IDs
+LAid <- read_csv(here('metadata/database-search-results/250619 3V MP lipidannotator.csv')) %>% select(-c('DT', 'CCS', 'Gas')) %>%
+  filter(!is.na(Score))
+colnames(LAid) <- paste('LA.', colnames(LAid), sep='')
+
+LAid <- LAid %>%
+ #mutate(feature = paste0('MZ', round(LA.mz, 4), '_', round(LA.RT, 2)), .after = 'LA.Feat ID') %>%
+ mutate(mz = LA.mz, rt =LA.RT, .before = `LA.Feat ID`)
+
+
+#functions for fuzzy join
+match_ppm <- function(x, y) {
+  abs(x - y) / x * 10^6 <= 10 }
+
+match_rt <- function(x, y) {
+  abs(x - y) <= 0.1 }
+
+#fuzzy join
+fuzzy <- fuzzyjoin::fuzzy_join(x = plist_filter_impute_areas %>% select(-contains(':area')), y = LAid,
+  by = c("mz", "rt"),
+  match_fun = list(match_ppm, match_rt),
+  mode = "full")
+
+fuzzy <- fuzzy %>% select(-mz.y, -rt.y) %>% rename(mz = mz.x, rt = rt.x)
+  
+#investigate matches
+LA_not_matched <- fuzzy %>% filter(is.na(feature)) %>% distinct(`LA.Feat ID`, .keep_all = TRUE)
+
+LA_matched <- fuzzy %>% filter(!is.na(feature)) %>% distinct(`LA.Feat ID`, .keep_all = TRUE)
+
+LA_duplicated <- fuzzy %>% filter(!is.na(feature), !is.na(`LA.Feat ID`)) %>%
+  add_count(feature, name = 'n_feat') %>%
+  add_count(`LA.Feat ID`, name = 'n_LAid') %>% filter(n_feat>1 | n_LAid > 1) %>%
+  relocate(c('n_feat', 'n_LAid'), .after = 'feature')
+
+ write_csv(LA_not_matched, paste0('lipidannotator-id-not-matched-',project, '.csv'))
+ write_csv(LA_matched, paste0('lipidannotator-id-matched-',project, '.csv'))
+ write_csv(LA_duplicated, paste0('lipidannotator-id-duplicatematches-',project, '.csv'))
+
+
+
+
+```
+
+CHUNK 6
+CEU mass mediator search
+```{r}
+
+masscharge <- tibble(mz = plist$mz)
+
+searchmass <- c(masscharge$mz)
+  
+  
+batch_df_pos <- batch_search(
+  cmm_url = 'https://ceumass.eps.uspceu.es/api/v3/batch',
+  metabolites_type = 'all-including-peptides',
+  databases = '["all-except-mine"]',
+  masses_mode = 'mz',
+  ion_mode = 'positive',
+  adducts = '["M+H","M+Na","M+NH4","M+H-H2O","M+2H","2M+H"]',
+  tolerance = 10,
+  tolerance_mode = 'ppm',
+  unique_mz = searchmass
+)
+
+write_csv(batch_df_pos, file = paste0(project, ' CEU ID.csv'))
+
+
+```
+
+
+
+
+

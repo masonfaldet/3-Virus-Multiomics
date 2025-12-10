@@ -79,7 +79,7 @@ config = L1SVMSelectorConfig(
 
     # Groupwise missingness filter
     filter_groupwise_missingness=True,  # group filter
-    min_prop=0.65,                      # what percentage must a feature be present within a group to be kept
+    min_prop=0.8,                       # what percentage must a feature be present within a group to be kept
     min_group_n=1,                      # min groups in filtering
     require_all_groups=False,           # False means min_prop in at least one group, True means min_prop in all groups
 

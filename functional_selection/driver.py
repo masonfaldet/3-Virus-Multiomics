@@ -56,64 +56,64 @@ Outputs:
   - Timestamped CSV: functional_selection_YYYYMMDD_HHMMSS.csv
   - JSON sidecar:   ._functional_selection_YYYYMMDD_HHMMSS.json
 """
-# # Edit this config block to control the functional selection run.
-# config = FunctionalSelectionConfig(
-#     root="../parquets",
-#     modalities=("lipid", "metabolite"),
-#     polarities=("+", "-"),
-#     viruses=("CHIKV", "DENV", "ZIKV"),
-#     mock_label="MOCK",
-#     time_points=(0, 5, 7, 14, 21),
-#
-#     group_cols=("condition", "time_point"),
-#     min_prop=0.65,
-#     min_group_n=1,
-#     require_all_groups=False,
-#
-#     center_curves=True,
-#     scale_curves=True,
-#
-#     n_permutations=1000,
-#     random_state=42,
-#
-#     log_fallback_eps=1e-3,
-#
-#     output_pattern="results/out_csvs/functional_selection.csv",
-# )
-#
-# # NOTE: No need to touch the code in the rest of this block
-#
-# # Build timestamped output path
-# timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-# base_dir, base_name = os.path.split(config.output_pattern)
-# stem, ext = os.path.splitext(base_name)
-# if not ext:
-#     ext = ".csv"
-# dated_name = f"{stem}_{timestamp}{ext}"
-# output_csv = os.path.join(base_dir, dated_name) if base_dir else dated_name
-#
-# # Ensure output directory exists
-# if base_dir:
-#     os.makedirs(base_dir, exist_ok=True)
-#
-# # Run analysis
-# res = run_functional_selection(config)
-# res.to_csv(output_csv, index=False)
-#
-# # Write sidecar JSON with config
-# csv_filename = os.path.basename(output_csv)
-# sidecar_stem, _ = os.path.splitext(csv_filename)
-# sidecar_name = f"._{sidecar_stem}.json"
-# sidecar_path = os.path.join(base_dir, sidecar_name) if base_dir else sidecar_name
-#
-# # Convert config to JSON-serializable dict (e.g. tuples -> lists)
-# cfg_dict = asdict(config)
-#
-# with open(sidecar_path, "w") as f:
-#     json.dump(cfg_dict, f, indent=2)
-#
-# print(f"Saved: {output_csv} ({len(res)} rows)")
-# print(f"Wrote sidecar: {sidecar_path}")
+# Edit this config block to control the functional selection run.
+config = FunctionalSelectionConfig(
+    root="../parquets",
+    modalities=("lipid", "metabolite"),
+    polarities=("+", "-"),
+    viruses=("CHIKV", "DENV", "ZIKV"),
+    mock_label="MOCK",
+    time_points=(0, 5, 7, 14, 21),
+
+    group_cols=("condition", "time_point"),
+    min_prop=0.65,
+    min_group_n=1,
+    require_all_groups=False,
+
+    center_curves=True,
+    scale_curves=True,
+
+    n_permutations=1000,
+    random_state=42,
+
+    log_fallback_eps=1e-3,
+
+    output_pattern="results/out_csvs/functional_selection.csv",
+)
+
+# NOTE: No need to touch the code in the rest of this block
+
+# Build timestamped output path
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+base_dir, base_name = os.path.split(config.output_pattern)
+stem, ext = os.path.splitext(base_name)
+if not ext:
+    ext = ".csv"
+dated_name = f"{stem}_{timestamp}{ext}"
+output_csv = os.path.join(base_dir, dated_name) if base_dir else dated_name
+
+# Ensure output directory exists
+if base_dir:
+    os.makedirs(base_dir, exist_ok=True)
+
+# Run analysis
+res = run_functional_selection(config)
+res.to_csv(output_csv, index=False)
+
+# Write sidecar JSON with config
+csv_filename = os.path.basename(output_csv)
+sidecar_stem, _ = os.path.splitext(csv_filename)
+sidecar_name = f"._{sidecar_stem}.json"
+sidecar_path = os.path.join(base_dir, sidecar_name) if base_dir else sidecar_name
+
+# Convert config to JSON-serializable dict (e.g. tuples -> lists)
+cfg_dict = asdict(config)
+
+with open(sidecar_path, "w") as f:
+    json.dump(cfg_dict, f, indent=2)
+
+print(f"Saved: {output_csv} ({len(res)} rows)")
+print(f"Wrote sidecar: {sidecar_path}")
 
 
 """

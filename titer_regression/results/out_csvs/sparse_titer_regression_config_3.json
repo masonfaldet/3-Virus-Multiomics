@@ -1,0 +1,47 @@
+{
+  "run_id": "3",
+  "parquet_root": "../parquets",
+  "results_root": "results",
+  "conditions": [
+    "CHIKV",
+    "DENV",
+    "ZIKV"
+  ],
+  "modalities": [
+    "metabolite",
+    "lipid"
+  ],
+  "polarities": [
+    "+",
+    "-"
+  ],
+  "time_points": [
+    5,
+    7,
+    14,
+    21
+  ],
+  "imputer": "two_step_label_agnostic",
+  "imputer_kwargs": {
+    "noise_scale": 0.001,
+    "nan_threshold": 0.4,
+    "k": 4
+  },
+  "group_wise_min_prop": 0.5,
+  "test_size": 0.2,
+  "random_state": 123,
+  "bootstrap": 50,
+  "l1_ratio": 0.95,
+  "alpha": 1,
+  "max_iter": 10000,
+  "epsilon": 1e-05,
+  "coef_threshold": 1e-06,
+  "ridge_alpha": 1.0,
+  "ridge_alpha_grid": [
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0
+  ]
+}
